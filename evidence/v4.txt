@@ -1,0 +1,8 @@
+DAO Demo Vote 4: Amend the DAO constitution
+
+Voting status: closed. The voting period ended on 7 November 2026.
+Votes in favor: 600,000
+Votes against: 400,000
+Abstentions: 0
+Quorum: 500,000 votes required
+Threshold: two-thirds majority of the votes for and against

@@ -1,0 +1,4 @@
+Corrected count for https://raw.githubusercontent.com/123Cryp/BallotProof/main/evidence/v1.txt
+
+The official recount found that the first tally missed a batch of ballots.
+Votes against: 1,500,000

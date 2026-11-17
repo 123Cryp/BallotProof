@@ -1,0 +1,8 @@
+DAO Demo Vote 1: Fund the community workshop
+
+Voting status: closed. The voting period ended on 5 November 2026.
+Votes in favor: 1,200,000
+Votes against: 800,000
+Abstentions: 50,000
+Quorum: 1,000,000 votes required
+Threshold: simple majority of the votes for and against

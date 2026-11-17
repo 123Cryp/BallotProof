@@ -1,0 +1,8 @@
+DAO Demo Vote 3: Add a new council seat
+
+Voting status: open. Voting is still in progress and ends in 2 days.
+Votes in favor: 900,000
+Votes against: 100,000
+Abstentions: 10,000
+Quorum: 500,000 votes required
+Threshold: simple majority of the votes for and against

@@ -1,0 +1,5 @@
+Review note for https://raw.githubusercontent.com/123Cryp/BallotProof/main/evidence/v4.txt
+
+The committee rechecked the count and confirmed the published numbers.
+Votes in favor: 600,000
+Votes against: 400,000
