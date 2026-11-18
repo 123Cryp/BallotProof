@@ -277,6 +277,10 @@ class TestParsers(unittest.TestCase):
         out = mod._ground({"for_quote": "Votes in favor: 300,000"}, mod._norm(text))
         self.assertEqual(out["for_quote"], "Votes in favor: 300,000")
 
+    def test_numbers_followed_by_a_comma_are_read(self):
+        self.assertEqual(mod._parse_votes("Votes in favor: 1,200,000, which is 60%"), 1200000 * S)
+        self.assertIsNone(mod._parse_votes("Votes in favor: 12,34"))
+
     def test_votes_zero_words(self):
         for q in ["Against: none", "Against: no votes", "Abstentions: zero", "Against: nil"]:
             self.assertEqual(mod._parse_votes(q), 0, q)
@@ -463,6 +467,34 @@ class TestGround(unittest.TestCase):
         long_page = "Votes in favor: 5 " + "x" * 300
         out = mod._ground({"for_quote": long_page}, mod._norm(long_page))
         self.assertLessEqual(len(out["for_quote"]), mod.MAX_QUOTE)
+
+    def test_quotes_cut_out_of_a_longer_number_or_qualifier_are_dropped(self):
+        cases = [
+            ("for_quote", "Votes in favor: 1", "Votes in favor: 1,200,000"),
+            ("for_quote", "Votes in favor: 1,200", "Votes in favor: 1,200,000"),
+            ("for_quote", "Votes in favor: 1.5", "Votes in favor: 1.5M"),
+            ("for_quote", "Votes in favor: 60", "Votes in favor: 60%"),
+            ("for_quote", "Votes in favor: 100", "Votes in favor: 100 or more"),
+            ("for_quote", "Votes in favor: 100", "Votes in favor: 100+"),
+            ("for_quote", "Votes in favor: 100", "Votes in favor: 100 (approx.)"),
+            ("for_quote", "100 votes in favor", "More than 100 votes in favor"),
+            ("for_quote", "200,000 votes in favor", "1,200,000 votes in favor"),
+            ("against_quote", "10 votes against", "-10 votes against"),
+            ("against_quote", "100 votes against", "~100 votes against"),
+            ("quorum_quote", "500 votes quorum", "over 500 votes quorum"),
+            ("quorum_quote", "Quorum: 1,000", "Quorum: 1,000,000 votes"),
+        ]
+        for key, q, text in cases:
+            self.assertEqual(mod._ground({key: q}, mod._norm(text))[key], "", (q, text))
+        ok = [
+            ("for_quote", "Votes in favor: 1,200,000", "Votes in favor: 1,200,000\nVotes against: 5"),
+            ("for_quote", "Votes in favor: 1,200,000", "Votes in favor: 1,200,000."),
+            ("for_quote", "Votes in favor: 1,200", "Votes in favor: 1,200,000 (draft) Final votes in favor: 1,200"),
+            ("quorum_quote", "1,000 votes quorum", "Quorum: at least 1,000 votes quorum"),
+            ("for_quote", "Votes in favor: 1.5M", "Votes in favor: 1.5M"),
+        ]
+        for key, q, text in ok:
+            self.assertEqual(mod._ground({key: q}, mod._norm(text))[key], q, (q, text))
 
     def test_swapped_labels_are_dropped(self):
         out = self.g(raw_of(f="Votes against: 800,000", a="Votes in favor: 1,200,000"))
@@ -651,16 +683,10 @@ class TestRegister(Base):
         res = self.call(BOB, "register_ballot", url_for("a"))
         self.assertTrue(res.startswith("REJECTED:"))
 
-    def test_ballot_cap(self):
-        old = mod.MAX_BALLOTS
-        mod.MAX_BALLOTS = 2
-        try:
-            self.register("a")
-            self.register("b")
-            res = self.call(ALICE, "register_ballot", self.put("c", PASS_PAGE), value=WEI)
-            self.assertTrue(res.startswith("REJECTED:"))
-        finally:
-            mod.MAX_BALLOTS = old
+    def test_many_registrations_never_lock_the_contract(self):
+        for i in range(600):
+            self.call(ALICE, "register_ballot", url_for("spam%d" % i))
+        self.assertEqual(self.register("real"), "b601")
 
 
 class TestAssess(Base):
