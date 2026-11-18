@@ -80,6 +80,10 @@ SIMPLE_RE = re.compile(
     r"|(?:over|above|greater\s+than|exceeds?)\s+(?:half|50\s*%)|>\s*50\s*%"
     r"|50\s*%\s*(?:\+\s*1|plus\s+one)"
 )
+QUALIFIED_RE = re.compile(r"(?:qualified|absolute|super|special|weighted)[\s-]*(?:[\w-]+[\s-]+){0,3}?majority")
+NEGATION_RE = re.compile(
+    r"(?<![a-z])(?:not|no|never|isn't|without|instead\s+of|rather\s+than|except)(?![a-z])"
+)
 PERCENT_NUM_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
 HALF_OK_RE = re.compile(r"^50(?:\.0+)?$")
 THIRDS_OK_RE = re.compile(r"^(?:66(?:\.6+7?)?|67)$")
@@ -95,7 +99,9 @@ QUORUM_INEXACT_RE = re.compile(
 )
 NEGATIVE_RE = re.compile(r"(?:^|[^\w])[-\u2212]\s*\d")
 INSTRUCTION_RE = re.compile(
-    r"(?<![a-z])(?:ignore|disregard|override|instructions?|assistant|prompt|system|respond|return)(?![a-z])"
+    r"(?<![a-z])(?:ignore\s+(?:all|any|the|previous|prior|above)|disregard|override|instructions?"
+    r"|system\s+prompt|as\s+an?\s+(?:ai|assistant)|you\s+(?:must|should|are)"
+    r"|(?:return|respond|reply|output|answer)\s+(?:with\s+)?(?:\d|json|only|the|exactly))"
 )
 CLOSED_RE = re.compile(
     r"(?<![a-z])(?:closed|ended|concluded|finished|finali[sz]ed|completed|executed|expired)(?![a-z])"
@@ -228,6 +234,8 @@ def _parse_quorum(quote):
 
 def _parse_threshold(quote):
     low = _norm(quote)
+    if QUALIFIED_RE.search(low) or NEGATION_RE.search(low):
+        return None
     two = TWO_THIRDS_RE.search(low) is not None
     simple = SIMPLE_RE.search(low) is not None
     if two == simple:
@@ -390,23 +398,10 @@ def _decide(raw):
     return _decided("FAILED", "threshold not met", raw, f)
 
 
-def _stated(raw):
-    f = _derive(raw)
-    return {
-        "for_quote": f["for"] >= 0,
-        "against_quote": f["against"] >= 0,
-        "abstain_quote": f["abstain"] >= 0,
-        "quorum_quote": f["quorum_kind"] != "UNSTATED",
-        "threshold_quote": f["threshold"] != "UNSTATED",
-        "status_quote": f["closed"] != "UNSTATED",
-    }
-
-
 def _merge_raw(base, counter):
-    st = _stated(counter)
     out = {k: _as_text(base.get(k)) for k in QUOTE_KEYS}
     for key in QUOTE_KEYS:
-        if st[key]:
+        if _as_text(counter.get(key)):
             out[key] = counter[key]
     return out
 
