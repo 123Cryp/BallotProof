@@ -31,8 +31,8 @@ MUTATIONS = [
             ("conflicting or missing thresholds accepted", "    if two == simple:\n        return None\n", "    if False:\n        return None\n"),
         ("closed and open together accepted", "    if closed == opened:\n        return None\n", "    if False:\n        return None\n"),
     ("for label accepts against words", "return has_for and not has_against and not has_abstain", "return has_for"),
-    ("counter overrides unparseable fields", '"for_quote": f["for"] >= 0,', '"for_quote": f["for"] >= -1,'),
-    ("counter overrides everything", "        if st[key]:\n            out[key] = counter[key]", "        if True:\n            out[key] = counter[key]"),
+    ("counter ignores unreadable quotes", '        if _as_text(counter.get(key)):\n', '        if _as_text(counter.get(key)) and _parse_votes(counter[key]) is not None:\n'),
+    ("counter overrides with empty quotes", '        if _as_text(counter.get(key)):\n', '        if True:\n'),
     ("validator skips grounding", "    if not _grounded(raw, page):\n        return False\n", "    if False:\n        return False\n"),
     ("pair validator skips raw check", 'and m["raw"] == merged_raw', "and True"),
     ("validator skips outcome check", 'and again["outcome"] == lead["outcome"]', "and True"),
@@ -91,6 +91,7 @@ MUTATIONS = [
     ("other percentages accepted as majority", "if any(not ok.match(n) for n in PERCENT_NUM_RE.findall(low)):", "if False:"),
     ("negated status accepted", "    if NEGATED_RE.search(low):\n        return None\n", "    if False:\n        return None\n"),
     ("instruction-like quotes kept", "            and INSTRUCTION_RE.search(_norm(q)) is None\n", ""),
+    ("qualified majority accepted", "    if QUALIFIED_RE.search(low) or NEGATION_RE.search(low):\n        return None\n", "    if False:\n        return None\n"),
     ("bonds missing from accounting", 'bonds += b["bond"]', "bonds += 0"),
 ]
 
