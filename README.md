@@ -110,7 +110,9 @@ Deploy it with the BallotProof address as `registry_address`. `execute("b1")` re
 
 ## Deployment
 
-Deploy `contracts/ballotproof.py` unchanged on GenLayer Studio with constructor `900, 1800`, then add the deployed address and explorer link here. The contract is submitted on its own; there is no frontend in this repository.
+Deployed on GenLayer Studio at `0xa8B9259cFfB3fEF7e6d11BD436afEE5c7CEd8bBC` (constructor `900, 1800`). Explorer: https://explorer-studio.genlayer.com/address/0xa8B9259cFfB3fEF7e6d11BD436afEE5c7CEd8bBC
+
+The deployed code is `contracts/ballotproof.py` unchanged. The contract is submitted on its own; there is no frontend in this repository.
 
 `evidence/` holds sample vote result pages for live testing. The sample prefix is `https://raw.githubusercontent.com/123Cryp/BallotProof/main/evidence/`.
 
