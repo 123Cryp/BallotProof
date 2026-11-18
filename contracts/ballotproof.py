@@ -73,22 +73,38 @@ THRESHOLD_RE = re.compile(
     r"(?<![a-z])(?:threshold|majority|pass(?:es|ing|ed)?|approval|adopt\w*|required|needs?|needed)(?![a-z])"
 )
 TWO_THIRDS_RE = re.compile(
-    r"(?<![a-z0-9.])(?:two[\s-]*thirds?|2\s*/\s*3|⅔|(?:66(?:\.6+7?)?|67)\s*%)"
+    r"(?<![a-z0-9.])(?:two[\s-]*thirds?|2\s*/\s*3|\u2154|(?:66(?:\.6+7?)?|67)\s*%)"
 )
 SIMPLE_RE = re.compile(
     r"simple\s+majority|more\s+than\s+(?:half|50\s*%)"
     r"|(?:over|above|greater\s+than|exceeds?)\s+(?:half|50\s*%)|>\s*50\s*%"
     r"|50\s*%\s*(?:\+\s*1|plus\s+one)"
 )
-MAJORITY_RE = re.compile(r"(?<![a-z])majority(?![a-z])")
-QUALIFIED_RE = re.compile(r"(?:qualified|absolute|super|special|weighted)[\s-]*majority")
+PERCENT_NUM_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+HALF_OK_RE = re.compile(r"^50(?:\.0+)?$")
+THIRDS_OK_RE = re.compile(r"^(?:66(?:\.6+7?)?|67)$")
+INEXACT_WORDS = (
+    r"more\s+than|less\s+than|fewer\s+than|at\s+most|up\s+to|over|under|above|below|around|about"
+    r"|approx\w*|roughly|nearly|almost|circa|exceed\w*|maximum|max|estimated|est|or\s+(?:more|fewer|less)"
+)
+VOTES_INEXACT_RE = re.compile(
+    r"(?<![a-z])(?:" + INEXACT_WORDS + r"|at\s+least|minimum|min)(?![a-z])|~|\u2248|\d\s*\+"
+)
+QUORUM_INEXACT_RE = re.compile(
+    r"(?<![a-z])(?:" + INEXACT_WORDS + r")(?![a-z])|~|\u2248|\d\s*\+"
+)
+NEGATIVE_RE = re.compile(r"(?:^|[^\w])[-\u2212]\s*\d")
+INSTRUCTION_RE = re.compile(
+    r"(?<![a-z])(?:ignore|disregard|override|instructions?|assistant|prompt|system|respond|return)(?![a-z])"
+)
 CLOSED_RE = re.compile(
     r"(?<![a-z])(?:closed|ended|concluded|finished|finali[sz]ed|completed|executed|expired)(?![a-z])"
 )
-NOT_CLOSED_RE = re.compile(
-    r"(?:not|never|yet\s+to\s+be|hasn't|has\s+not|haven't|isn't|is\s+not|wasn't|was\s+not)"
+NEGATED_RE = re.compile(
+    r"(?:(?<![a-z])(?:not|never|yet\s+to\s+be|hasn't|has\s+not|haven't|isn't|is\s+not|wasn't|was\s+not)"
     r"\s+(?:yet\s+)?(?:been\s+)?"
-    r"(?:closed|ended|concluded|finished|finali[sz]ed|completed|executed)(?![a-z])"
+    r"(?:open|opened|active|started|begun|closed|ended|concluded|finished|finali[sz]ed|completed|executed)"
+    r"|no\s+longer\s+(?:open|active|ongoing|running|live))(?![a-z])"
 )
 OPEN_RE = re.compile(
     r"(?<![a-z])(?:open|active|ongoing|pending|live|running|closes|closing|ending|in\s+progress"
@@ -183,6 +199,8 @@ def _scaled(low, m):
 
 def _parse_votes(quote):
     low, plain, _ = _scan(quote)
+    if VOTES_INEXACT_RE.search(low) or NEGATIVE_RE.search(low):
+        return None
     if len(plain) > 1:
         return None
     if plain:
@@ -194,6 +212,8 @@ def _parse_votes(quote):
 
 def _parse_quorum(quote):
     low, plain, percent = _scan(quote)
+    if QUORUM_INEXACT_RE.search(low) or NEGATIVE_RE.search(low):
+        return "UNSTATED", -1
     if len(plain) > 1:
         return "UNSTATED", -1
     if plain:
@@ -208,21 +228,20 @@ def _parse_quorum(quote):
 
 def _parse_threshold(quote):
     low = _norm(quote)
-    if QUALIFIED_RE.search(low):
-        return None
     two = TWO_THIRDS_RE.search(low) is not None
     simple = SIMPLE_RE.search(low) is not None
-    if two:
-        return None if simple else "TWO_THIRDS"
-    if simple or MAJORITY_RE.search(low):
-        return "SIMPLE"
-    return None
+    if two == simple:
+        return None
+    ok = THIRDS_OK_RE if two else HALF_OK_RE
+    if any(not ok.match(n) for n in PERCENT_NUM_RE.findall(low)):
+        return None
+    return "TWO_THIRDS" if two else "SIMPLE"
 
 
 def _parse_status(quote):
     low = _norm(quote)
-    if NOT_CLOSED_RE.search(low):
-        return "OPEN"
+    if NEGATED_RE.search(low):
+        return None
     closed = CLOSED_RE.search(low) is not None
     opened = OPEN_RE.search(low) is not None
     if closed == opened:
@@ -299,7 +318,12 @@ def _ground(obj, page_norm):
     src = obj if isinstance(obj, dict) else {}
     for key in QUOTE_KEYS:
         q = " ".join(_as_text(src.get(key)).split())[:MAX_QUOTE]
-        keep = len(q) >= 3 and _norm(q) in page_norm and _label_ok(key, q)
+        keep = (
+            len(q) >= 3
+            and _norm(q) in page_norm
+            and _label_ok(key, q)
+            and INSTRUCTION_RE.search(_norm(q)) is None
+        )
         out[key] = q if keep else ""
     return out
 
