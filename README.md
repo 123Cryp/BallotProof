@@ -11,7 +11,7 @@ Someone registers the URL of a vote result page. GenLayer validators fetch the p
 | Check the URL is https, clean, and under an owner-approved prefix | code |
 | Fetch the page | each validator |
 | Locate six facts on the page and copy exact quotes | model |
-| Drop every quote that is not an exact substring of the page, or whose wording does not match its field (a quote about votes against cannot fill the votes-in-favor field) | code |
+| Drop every quote that is not an exact substring of the page, that was cut out of a longer number or away from a qualifier (`1` out of `1,200,000`, `100` out of `more than 100` or `100+`), or whose wording does not match its field (a quote about votes against cannot fill the votes-in-favor field) | code |
 | Parse vote counts, the quorum, the threshold type and the closed/open state from the quotes | code |
 | Compare quorum and threshold and assign the result code | code |
 | Agree on the facts that drive the rules and on the result code | validators (exact match) |

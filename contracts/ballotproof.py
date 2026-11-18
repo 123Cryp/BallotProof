@@ -14,7 +14,6 @@ MAX_ATTEMPTS = 3
 MAX_REJECTIONS = 2
 MAX_INCONCLUSIVE = 3
 MAX_PREFIXES = 10
-MAX_BALLOTS = 500
 MAX_LABEL = 60
 MAX_URL = 300
 MAX_PAGE = 12000
@@ -35,7 +34,7 @@ QUOTE_KEYS = (
 )
 THRESHOLDS = ("SIMPLE", "TWO_THIRDS")
 
-TOKEN_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
+TOKEN_RE = re.compile(r"\d+(?:,\d+)*(?:\.\d+)?")
 GROUPED_RE = re.compile(r"^\d{1,3}(?:,\d{3})+(?:\.\d+)?$")
 PERCENT_RE = re.compile(r"\s*(?:%|percent(?![a-z])|per\s+cent(?![a-z]))")
 SUFFIX_RE = re.compile(r"\s*(thousand|million|billion|bn|k|m|b)(?![a-z0-9])")
@@ -96,6 +95,17 @@ VOTES_INEXACT_RE = re.compile(
 )
 QUORUM_INEXACT_RE = re.compile(
     r"(?<![a-z])(?:" + INEXACT_WORDS + r")(?![a-z])|~|\u2248|\d\s*\+"
+)
+LEAD_RE = re.compile(
+    r"(?:(?<![a-z])(?:" + INEXACT_WORDS + r"|at\s+least|minimum|min)|~|\u2248|[-\u2212+<>]|[0-9][.,]?)\s*$"
+)
+QUORUM_LEAD_RE = re.compile(
+    r"(?:(?<![a-z])(?:" + INEXACT_WORDS + r")|~|\u2248|[-\u2212+<>]|[0-9][.,]?)\s*$"
+)
+TAIL_RE = re.compile(
+    r"[0-9]|[.,][0-9]|\s*(?:\+|%|percent(?![a-z])|per\s+cent(?![a-z])"
+    r"|(?:thousand|million|billion|bn|k|m|b)(?![a-z0-9])"
+    r"|or\s+(?:more|fewer|less|so)(?![a-z])|\(?\s*(?:approx\w*|est\w*|roughly|about)(?![a-z]))"
 )
 NEGATIVE_RE = re.compile(r"(?:^|[^\w])[-\u2212]\s*\d")
 INSTRUCTION_RE = re.compile(
@@ -276,6 +286,26 @@ def _label_ok(key, quote):
     return True
 
 
+def _edges_fit(page_norm, start, end, key):
+    if page_norm[start] in "0123456789.,":
+        lead = QUORUM_LEAD_RE if key == "quorum_quote" else LEAD_RE
+        if lead.search(page_norm[max(0, start - 24):start]):
+            return False
+    if page_norm[end - 1] in "0123456789.," and TAIL_RE.match(page_norm, end):
+        return False
+    return True
+
+
+def _on_page(q, page_norm, key):
+    nq = _norm(q)
+    i = page_norm.find(nq)
+    while i >= 0:
+        if _edges_fit(page_norm, i, i + len(nq), key):
+            return True
+        i = page_norm.find(nq, i + 1)
+    return False
+
+
 def _fetch_page(url):
     try:
         text = gl.nondet.web.render(url, mode="text")
@@ -328,7 +358,7 @@ def _ground(obj, page_norm):
         q = " ".join(_as_text(src.get(key)).split())[:MAX_QUOTE]
         keep = (
             len(q) >= 3
-            and _norm(q) in page_norm
+            and _on_page(q, page_norm, key)
             and _label_ok(key, q)
             and INSTRUCTION_RE.search(_norm(q)) is None
         )
@@ -678,8 +708,6 @@ class BallotProof(gl.Contract):
             return self._reject("ballot URL is not under an allowed https prefix", value)
         if value % WEI != 0 or value > MAX_ASSURANCE_GEN * WEI:
             return self._reject("assurance must be a whole number of GEN from 0 to 100", value)
-        if int(self.ballot_count) >= MAX_BALLOTS:
-            return self._reject("ballot limit reached", value)
         if u in self.url_index and not self._replaceable(self._load(self.url_index[u])):
             return self._reject("ballot URL is already registered", value)
         label = ""
@@ -939,7 +967,6 @@ class BallotProof(gl.Contract):
                 "max_attempts": MAX_ATTEMPTS,
                 "max_rejections": MAX_REJECTIONS,
                 "max_inconclusive": MAX_INCONCLUSIVE,
-                "max_ballots": MAX_BALLOTS,
             }
         )
 
